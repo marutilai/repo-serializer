@@ -35,6 +35,7 @@ serialize("/path/to/repository", "output.txt")
 - **Directory Structure:** Clearly visualize repository structure in ASCII format.
 - **File Filtering**: Excludes common binary files, cache directories, hidden files, and irrelevant artifacts to keep outputs concise and focused.
 - **Smart Content Handling**: 
+  - Parses Jupyter notebooks to extract markdown and code cells with sample outputs
   - Limits CSV files to first 5 lines
   - Truncates large text files after 1000 lines
   - Handles non-UTF-8 and binary files gracefully
