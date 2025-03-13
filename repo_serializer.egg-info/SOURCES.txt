@@ -1,0 +1,10 @@
+README.md
+setup.py
+repo_serializer/__init__.py
+repo_serializer/cli.py
+repo_serializer/serializer.py
+repo_serializer.egg-info/PKG-INFO
+repo_serializer.egg-info/SOURCES.txt
+repo_serializer.egg-info/dependency_links.txt
+repo_serializer.egg-info/entry_points.txt
+repo_serializer.egg-info/top_level.txt

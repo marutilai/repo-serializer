@@ -1,0 +1,2 @@
+[console_scripts]
+repo-serializer = repo_serializer.cli:main
