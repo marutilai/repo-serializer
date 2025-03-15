@@ -219,150 +219,163 @@ def generate_ascii_structure(path, prefix="", serialized_content=None):
     return serialized_content
 
 
-def serialize_repo(repo_path, output_file, max_lines=1000):
+def serialize_repo(
+    repo_path, output_file, max_lines=1000, return_content=False, structure_only=False
+):
     serialized_content = []
 
     serialized_content.append("Directory Structure:")
     generate_ascii_structure(repo_path, serialized_content=serialized_content)
 
-    serialized_content.append("\nFiles Content:")
-    for root, dirs, files in os.walk(repo_path):
-        dirs[:] = [d for d in dirs if not should_skip(d, True)]
-        for file in files:
-            if should_skip(file, False):
-                continue
-            file_path = os.path.join(root, file)
-            rel_path = os.path.relpath(file_path, repo_path)
-            serialized_content.append(f"\n--- Start of {rel_path} ---\n")
+    # Skip file contents if structure_only is True
+    if not structure_only:
+        serialized_content.append("\nFiles Content:")
+        for root, dirs, files in os.walk(repo_path):
+            dirs[:] = [d for d in dirs if not should_skip(d, True)]
+            for file in files:
+                if should_skip(file, False):
+                    continue
+                file_path = os.path.join(root, file)
+                rel_path = os.path.relpath(file_path, repo_path)
+                serialized_content.append(f"\n--- Start of {rel_path} ---\n")
 
-            # Check file type
-            is_csv = file.lower().endswith(".csv")
-            is_notebook = file.lower().endswith(".ipynb")
+                # Check file type
+                is_csv = file.lower().endswith(".csv")
+                is_notebook = file.lower().endswith(".ipynb")
 
-            try:
-                if is_notebook:
-                    # Special handling for Jupyter notebooks
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        try:
-                            notebook = json.load(f)
-                            cells_content = []
+                try:
+                    if is_notebook:
+                        # Special handling for Jupyter notebooks
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            try:
+                                notebook = json.load(f)
+                                cells_content = []
 
-                            # Add notebook metadata if available
-                            if (
-                                "metadata" in notebook
-                                and "kernelspec" in notebook["metadata"]
-                            ):
-                                kernel = notebook["metadata"]["kernelspec"].get(
-                                    "display_name", "Unknown"
-                                )
-                                cells_content.append(
-                                    f"Jupyter Notebook (Kernel: {kernel})\n"
-                                )
-
-                            # Process cells - don't limit the number of cells
-                            for i, cell in enumerate(notebook.get("cells", [])):
-                                cell_type = cell.get("cell_type", "unknown")
-
-                                if cell_type == "markdown":
-                                    source = "".join(cell.get("source", []))
+                                # Add notebook metadata if available
+                                if (
+                                    "metadata" in notebook
+                                    and "kernelspec" in notebook["metadata"]
+                                ):
+                                    kernel = notebook["metadata"]["kernelspec"].get(
+                                        "display_name", "Unknown"
+                                    )
                                     cells_content.append(
-                                        f"[Markdown Cell {i+1}]\n{source}\n"
+                                        f"Jupyter Notebook (Kernel: {kernel})\n"
                                     )
 
-                                elif cell_type == "code":
-                                    source = "".join(cell.get("source", []))
-                                    # Don't limit code cells, show all code
-                                    cells_content.append(
-                                        f"[Code Cell {i+1}]\n{source}\n"
-                                    )
+                                # Process cells - don't limit the number of cells
+                                for i, cell in enumerate(notebook.get("cells", [])):
+                                    cell_type = cell.get("cell_type", "unknown")
 
-                                    # Include a sample of outputs if present, but limit these
-                                    outputs = cell.get("outputs", [])
-                                    if outputs:
-                                        output_text = []
-                                        # Only show first output and limit its size
+                                    if cell_type == "markdown":
+                                        source = "".join(cell.get("source", []))
+                                        cells_content.append(
+                                            f"[Markdown Cell {i+1}]\n{source}\n"
+                                        )
+
+                                    elif cell_type == "code":
+                                        source = "".join(cell.get("source", []))
+                                        # Don't limit code cells, show all code
+                                        cells_content.append(
+                                            f"[Code Cell {i+1}]\n{source}\n"
+                                        )
+
+                                        # Include a sample of outputs if present, but limit these
+                                        outputs = cell.get("outputs", [])
                                         if outputs:
-                                            output = outputs[0]
-                                            if "text" in output:
-                                                text = "".join(output["text"])
-                                                # Limit output text to 3 lines
-                                                if len(text.splitlines()) > 3:
-                                                    text_lines = text.splitlines()[:3]
-                                                    text = "\n".join(text_lines)
-                                                    text += (
-                                                        "\n... [output truncated] ..."
+                                            output_text = []
+                                            # Only show first output and limit its size
+                                            if outputs:
+                                                output = outputs[0]
+                                                if "text" in output:
+                                                    text = "".join(output["text"])
+                                                    # Limit output text to 3 lines
+                                                    if len(text.splitlines()) > 3:
+                                                        text_lines = text.splitlines()[
+                                                            :3
+                                                        ]
+                                                        text = "\n".join(text_lines)
+                                                        text += "\n... [output truncated] ..."
+                                                    output_text.append(text)
+                                                elif (
+                                                    "data" in output
+                                                    and "text/plain" in output["data"]
+                                                ):
+                                                    text = "".join(
+                                                        output["data"]["text/plain"]
                                                     )
-                                                output_text.append(text)
-                                            elif (
-                                                "data" in output
-                                                and "text/plain" in output["data"]
-                                            ):
-                                                text = "".join(
-                                                    output["data"]["text/plain"]
+                                                    # Limit output text to 3 lines
+                                                    if len(text.splitlines()) > 3:
+                                                        text_lines = text.splitlines()[
+                                                            :3
+                                                        ]
+                                                        text = "\n".join(text_lines)
+                                                        text += "\n... [output truncated] ..."
+                                                    output_text.append(text)
+
+                                            if output_text:
+                                                cells_content.append(
+                                                    "Output (sample):\n"
+                                                    + "\n".join(output_text)
+                                                    + "\n"
                                                 )
-                                                # Limit output text to 3 lines
-                                                if len(text.splitlines()) > 3:
-                                                    text_lines = text.splitlines()[:3]
-                                                    text = "\n".join(text_lines)
-                                                    text += (
-                                                        "\n... [output truncated] ..."
-                                                    )
-                                                output_text.append(text)
 
-                                        if output_text:
-                                            cells_content.append(
-                                                "Output (sample):\n"
-                                                + "\n".join(output_text)
-                                                + "\n"
-                                            )
+                                            if len(outputs) > 1:
+                                                cells_content.append(
+                                                    f"... [{len(outputs) - 1} more outputs not shown] ...\n"
+                                                )
 
-                                        if len(outputs) > 1:
-                                            cells_content.append(
-                                                f"... [{len(outputs) - 1} more outputs not shown] ...\n"
-                                            )
-
-                            serialized_content.append("\n".join(cells_content))
-                        except json.JSONDecodeError:
-                            serialized_content.append(
-                                "[Invalid or corrupted notebook file]"
-                            )
-                elif is_csv:
-                    # Existing CSV handling
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        lines = []
-                        for i, line in enumerate(f):
-                            if i >= 5:
-                                lines.append(
-                                    "... [remaining CSV content truncated] ..."
+                                serialized_content.append("\n".join(cells_content))
+                            except json.JSONDecodeError:
+                                serialized_content.append(
+                                    "[Invalid or corrupted notebook file]"
                                 )
-                                break
-                            lines.append(line.rstrip())
-                        serialized_content.append("\n".join(lines))
-                else:
-                    # Existing handling for other text files
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        lines = []
-                        for i, line in enumerate(f):
-                            if i >= max_lines:
-                                lines.append(
-                                    f"\n... [file truncated after {max_lines} lines] ..."
-                                )
-                                break
-                            lines.append(line.rstrip())
-
-                        if len(lines) >= max_lines:
+                    elif is_csv:
+                        # Existing CSV handling
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            lines = []
+                            for i, line in enumerate(f):
+                                if i >= 5:
+                                    lines.append(
+                                        "... [remaining CSV content truncated] ..."
+                                    )
+                                    break
+                                lines.append(line.rstrip())
                             serialized_content.append("\n".join(lines))
-                        else:
-                            f.seek(0)
-                            serialized_content.append(f.read())
-            except UnicodeDecodeError:
-                serialized_content.append("[BINARY or NON-UTF8 CONTENT]")
-            except Exception as e:
-                serialized_content.append(f"[Error reading file: {str(e)}]")
+                    else:
+                        # Existing handling for other text files
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            lines = []
+                            for i, line in enumerate(f):
+                                if i >= max_lines:
+                                    lines.append(
+                                        f"\n... [file truncated after {max_lines} lines] ..."
+                                    )
+                                    break
+                                lines.append(line.rstrip())
 
+                            if len(lines) >= max_lines:
+                                serialized_content.append("\n".join(lines))
+                            else:
+                                f.seek(0)
+                                serialized_content.append(f.read())
+                except UnicodeDecodeError:
+                    serialized_content.append("[BINARY or NON-UTF8 CONTENT]")
+                except Exception as e:
+                    serialized_content.append(f"[Error reading file: {str(e)}]")
+
+    content_str = "\n".join(serialized_content)
     with open(output_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(serialized_content))
+        f.write(content_str)
+
+    if return_content:
+        return content_str
 
 
-def serialize(repo_path, output_file):
-    serialize_repo(repo_path, output_file)
+def serialize(repo_path, output_file, return_content=False, structure_only=False):
+    return serialize_repo(
+        repo_path,
+        output_file,
+        return_content=return_content,
+        structure_only=structure_only,
+    )

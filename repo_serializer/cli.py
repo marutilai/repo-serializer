@@ -14,6 +14,18 @@ def main():
         default="repo_serialized.txt",
         help="Output file path (default: repo_serialized.txt)",
     )
+    parser.add_argument(
+        "-c",
+        "--clipboard",
+        action="store_true",
+        help="Copy the output to clipboard in addition to saving to file",
+    )
+    parser.add_argument(
+        "-s",
+        "--structure-only",
+        action="store_true",
+        help="Only include directory structure and filenames (no file contents)",
+    )
 
     args = parser.parse_args()
 
@@ -23,8 +35,31 @@ def main():
         return 1
 
     # Serialize the repository
-    serialize(args.repo_path, args.output)
+    content = serialize(
+        args.repo_path,
+        args.output,
+        return_content=True,
+        structure_only=args.structure_only,
+    )
+
     print(f"Repository serialized to {args.output}")
+    if args.structure_only:
+        print("Note: Only directory structure was included (no file contents)")
+
+    # Copy to clipboard if requested
+    if args.clipboard:
+        try:
+            import pyperclip
+
+            pyperclip.copy(content)
+            print("Content also copied to clipboard")
+        except ImportError:
+            print(
+                "Warning: pyperclip package not found. Install it with 'pip install pyperclip' to enable clipboard functionality."
+            )
+        except Exception as e:
+            print(f"Warning: Failed to copy to clipboard: {str(e)}")
+
     return 0
 
 

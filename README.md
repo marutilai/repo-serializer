@@ -19,6 +19,12 @@ repo-serializer /path/to/repository
 
 # Specify output file
 repo-serializer /path/to/repository -o output.txt
+
+# Copy to clipboard in addition to saving to file
+repo-serializer /path/to/repository -c
+
+# Use structure-only mode to output only the directory structure and filenames
+repo-serializer /path/to/repository -s
 ```
 
 ### Python API
@@ -33,6 +39,7 @@ serialize("/path/to/repository", "output.txt")
 ## Features
 
 - **Directory Structure:** Clearly visualize repository structure in ASCII format.
+- **Structure-Only Mode:** Option to output only the directory structure and filenames without file contents.
 - **File Filtering**: Excludes common binary files, cache directories, hidden files, and irrelevant artifacts to keep outputs concise and focused.
 - **Smart Content Handling**: 
   - Parses Jupyter notebooks to extract markdown and code cells with sample outputs
@@ -40,6 +47,7 @@ serialize("/path/to/repository", "output.txt")
   - Truncates large text files after 1000 lines
   - Handles non-UTF-8 and binary files gracefully
 - **Extensive Filtering**: Skips common configuration files, build artifacts, test directories, and more.
+- **Clipboard Integration**: Option to copy output directly to clipboard.
 
 ## Example
 
