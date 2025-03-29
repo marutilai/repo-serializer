@@ -11,8 +11,8 @@ def run_command(cmd):
 
 
 def main():
-    # Use current repository directory
-    repo_dir = str(Path(__file__).parent)
+    # Use root repository directory (one level up from dev)
+    repo_dir = str(Path(__file__).parent.parent)
     output_dir = os.path.join(repo_dir, "test_outputs")
 
     # Create output directory if it doesn't exist

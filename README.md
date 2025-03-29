@@ -87,7 +87,7 @@ repo-serializer /path/to/test/repo -o test_output.txt
 
 Run the test script:
 ```bash
-./test_dev.py
+./dev/test_dev.py
 ```
 
 This will:

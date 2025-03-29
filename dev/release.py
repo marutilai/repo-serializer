@@ -76,7 +76,7 @@ def main():
 
     # Run tests
     print("\nRunning tests...")
-    if not run_command(["python", "test_dev.py"], "Tests failed"):
+    if not run_command(["python", "dev/test_dev.py"], "Tests failed"):
         return 1
 
     # Git commands
