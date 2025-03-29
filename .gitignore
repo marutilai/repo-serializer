@@ -113,4 +113,9 @@ htmlcov/
 .nox/
 coverage.xml
 *.cover
-.hypothesis/ 
+.hypothesis/
+
+# Test outputs and generated files
+test_outputs/
+*.txt
+!README.txt  # Don't ignore README.txt if it exists 

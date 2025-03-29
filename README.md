@@ -25,6 +25,15 @@ repo-serializer /path/to/repository -c
 
 # Use structure-only mode to output only the directory structure and filenames
 repo-serializer /path/to/repository -s
+
+# Only include Python files (.py, .ipynb)
+repo-serializer /path/to/repository --python
+
+# Only include JavaScript/TypeScript files
+repo-serializer /path/to/repository --javascript
+
+# Combine with other options
+repo-serializer /path/to/repository --python -s -c  # Python files, structure only, copy to clipboard
 ```
 
 ### Python API
@@ -59,3 +68,29 @@ repo-serializer /Users/example_user/projects/my_repo -o repo_snapshot.txt
 ## Contributing
 
 Pull requests and improvements are welcome! Please ensure your contributions are clearly documented and tested.
+
+## Development
+
+### Quick Testing
+
+For quick testing during development:
+
+```bash
+# Install in development mode
+pip install -e .
+
+# Now any changes to the source code take effect immediately
+repo-serializer /path/to/test/repo -o test_output.txt
+```
+
+### Full Test Suite
+
+Run the test script:
+```bash
+./test_dev.py
+```
+
+This will:
+1. Install the package in development mode
+2. Run multiple test scenarios
+3. Generate test outputs for review

@@ -26,6 +26,16 @@ def main():
         action="store_true",
         help="Only include directory structure and filenames (no file contents)",
     )
+    parser.add_argument(
+        "--python",
+        action="store_true",
+        help="Only include Python files (.py, .ipynb)",
+    )
+    parser.add_argument(
+        "--javascript",
+        action="store_true",
+        help="Only include JavaScript/TypeScript files (.js, .jsx, .ts, .tsx, etc.)",
+    )
 
     args = parser.parse_args()
 
@@ -34,12 +44,24 @@ def main():
         print(f"Error: {args.repo_path} is not a valid directory")
         return 1
 
+    # Handle language filtering
+    language = None
+    if args.python:
+        language = "python"
+    elif args.javascript:
+        language = "javascript"
+
+    if args.python and args.javascript:
+        print("Error: Cannot specify both --python and --javascript")
+        return 1
+
     # Serialize the repository
     content = serialize(
         args.repo_path,
         args.output,
         return_content=True,
         structure_only=args.structure_only,
+        language=language,
     )
 
     print(f"Repository serialized to {args.output}")

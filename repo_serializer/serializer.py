@@ -1,213 +1,57 @@
 import os
 import json
-
-SKIP_EXTENSIONS = {
-    ".pyc",
-    ".exe",
-    ".dll",
-    ".so",
-    ".o",
-    ".bin",
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".bmp",
-    ".ico",
-    ".svg",
-    ".log",
-    ".zip",
-    ".gz",
-    ".tar",
-    ".rar",
-    ".7z",
-    ".pdf",
-    ".mp4",
-    ".mp3",
-    ".wav",
-    ".class",
-    ".jar",
-    ".db",
-    ".sqlite",
-    ".map",  # Source Maps
-    ".d.ts",  # TypeScript Declaration Files
-    ".lock",  # Dependency Lock Files
-    ".lockb",
-    ".lock.json",
-    ".lock.yaml",
-    ".lock.yml",
-    ".lock.toml",
-    ".toml",
-    ".yarnrc",
-    ".npmrc",
-    # Config files
-    ".ini",
-    ".cfg",
-    ".conf",
-    ".config",
-    ".yaml",
-    ".yml",
-    ".env",
-    # Large data files
-    ".parquet",
-    ".avro",
-    ".hdf5",
-    ".h5",
-    ".feather",
-    ".arrow",
-    ".pickle",
-    ".pkl",
-    # Minified files
-    ".min.js",
-    ".min.css",
-    # Backup files
-    ".bak",
-    ".backup",
-    ".swp",
-    "~",
-    # Test data
-    ".fixture",
-    ".test.js",
-    ".spec.js",
-    ".test.ts",
-    ".spec.ts",
-}
-
-SKIP_FILES = {
-    "package-lock.json",
-    "yarn.lock",
-    "pnpm-lock.yaml",
-    "composer.lock",
-    "Cargo.lock",
-    "Pipfile.lock",
-    "poetry.lock",
-    "Gemfile.lock",
-    "go.sum",
-    # Common config files
-    ".gitignore",
-    ".gitattributes",
-    ".editorconfig",
-    ".eslintrc",
-    ".prettierrc",
-    "tsconfig.json",
-    "tslint.json",
-    "babel.config.js",
-    "jest.config.js",
-    "webpack.config.js",
-    "rollup.config.js",
-    "vite.config.js",
-    "next.config.js",
-    "nuxt.config.js",
-    "svelte.config.js",
-    ".browserslistrc",
-    ".npmignore",
-    # License and legal files
-    "LICENSE",
-    "LICENSE.txt",
-    "LICENSE.md",
-    "COPYING",
-    "NOTICE",
-    # Documentation files (if you want to skip them)
-    "CHANGELOG.md",
-    "CONTRIBUTING.md",
-    "CODE_OF_CONDUCT.md",
-    # CI/CD config files
-    ".travis.yml",
-    ".gitlab-ci.yml",
-    ".github/workflows/ci.yml",
-    "azure-pipelines.yml",
-    "Jenkinsfile",
-    ".circleci/config.yml",
-}
-
-SKIP_DIRS = {
-    "__pycache__",
-    ".git",
-    ".idea",
-    ".vscode",
-    "node_modules",
-    ".DS_Store",
-    "venv",
-    ".venv",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".coverage",
-    ".cache",
-    ".temp",
-    ".build",
-    ".dist",
-    ".out",
-    ".tmp",
-    ".log",
-    "temp",
-    "tmp",
-    "node_modules/.vite",
-    "cypress",
-    "dist",
-    "build",
-    "out",
-    "cache",
-    "temp",
-    # Test directories
-    "tests",
-    "test",
-    "__tests__",
-    "spec",
-    "__mocks__",
-    "fixtures",
-    "e2e",
-    # Documentation directories
-    "docs",
-    "doc",
-    "documentation",
-    # Build artifacts
-    "coverage",
-    ".nyc_output",
-    "reports",
-    "site",
-    "public",
-    "static",
-    # Dependency directories beyond node_modules
-    "vendor",
-    "bower_components",
-    "jspm_packages",
-    ".pnp",
-    # IDE specific
-    ".settings",
-    ".project",
-    ".classpath",
-    ".factorypath",
-    # Misc
-    "examples",
-    "sample",
-    "demo",
-    "assets",
-    "images",
-    "img",
-    "fonts",
-}
+from .config import (
+    SKIP_EXTENSIONS,
+    SKIP_FILES,
+    SKIP_DIRS,
+    LANGUAGE_PATTERNS,
+)
 
 
-def should_skip(name, is_dir=False):
+def should_skip(name, is_dir=False, language=None):
+    """Enhanced skip check with language filtering"""
+    # First apply basic skip rules
     if name.startswith("."):
         return True
     if is_dir and name in SKIP_DIRS:
         return True
     if not is_dir:
-        if os.path.splitext(name)[1] in SKIP_EXTENSIONS:
-            return True
         if name in SKIP_FILES:
             return True
+
+        # If language filtering is enabled
+        if language:
+            patterns = LANGUAGE_PATTERNS.get(language, {})
+            ext = os.path.splitext(name)[1].lower()
+
+            # Skip if extension doesn't match language
+            if ext not in patterns.get("extensions", set()):
+                return True
+
+            # Skip if matches skip patterns
+            if any(
+                pattern in name.lower()
+                for pattern in patterns.get("skip_patterns", set())
+            ):
+                return True
+
+            # File matches language requirements, don't skip
+            return False
+
+        # No language filtering, apply normal extension skip
+        if os.path.splitext(name)[1] in SKIP_EXTENSIONS:
+            return True
+
     return False
 
 
-def generate_ascii_structure(path, prefix="", serialized_content=None):
+def generate_ascii_structure(path, prefix="", serialized_content=None, language=None):
     if serialized_content is None:
         serialized_content = []
     entries = sorted(
         e
         for e in os.listdir(path)
-        if not should_skip(e, os.path.isdir(os.path.join(path, e)))
+        if not should_skip(e, os.path.isdir(os.path.join(path, e)), language)
     )
     for idx, entry in enumerate(entries):
         entry_path = os.path.join(path, entry)
@@ -215,25 +59,78 @@ def generate_ascii_structure(path, prefix="", serialized_content=None):
         serialized_content.append(f"{prefix}{connector}{entry}")
         if os.path.isdir(entry_path):
             extension = "    " if idx == len(entries) - 1 else "│   "
-            generate_ascii_structure(entry_path, prefix + extension, serialized_content)
+            generate_ascii_structure(
+                entry_path, prefix + extension, serialized_content, language
+            )
     return serialized_content
 
 
+def count_lines(content, structure_only=False):
+    """Count total lines and lines by language in the content."""
+    total_lines = 0
+    language_lines = {
+        "python": 0,
+        "javascript": 0,
+        "markdown": 0,
+        "bash": 0,
+        "other": 0,
+    }
+
+    if structure_only:
+        # For structure-only mode, just count all lines
+        total_lines = len([line for line in content.split("\n") if line.strip()])
+        # Don't try to categorize by language in structure-only mode
+        language_lines["other"] = total_lines
+    else:
+        current_file = None
+        for line in content.split("\n"):
+            if line.startswith("--- Start of "):
+                current_file = line.replace("--- Start of ", "").replace(" ---", "")
+            elif current_file:
+                total_lines += 1
+                # Count by file extension
+                ext = os.path.splitext(current_file)[1].lower()
+                if ext in {".py", ".pyw", ".pyx", ".ipynb"}:
+                    language_lines["python"] += 1
+                elif ext in {".js", ".jsx", ".ts", ".tsx"}:
+                    language_lines["javascript"] += 1
+                elif ext in {".md", ".markdown"}:
+                    language_lines["markdown"] += 1
+                elif ext in {".sh", ".bash"}:
+                    language_lines["bash"] += 1
+                else:
+                    language_lines["other"] += 1
+
+    return total_lines, language_lines
+
+
 def serialize_repo(
-    repo_path, output_file, max_lines=1000, return_content=False, structure_only=False
+    repo_path,
+    output_file,
+    max_lines=1000,
+    return_content=False,
+    structure_only=False,
+    language=None,
 ):
     serialized_content = []
 
-    serialized_content.append("Directory Structure:")
-    generate_ascii_structure(repo_path, serialized_content=serialized_content)
+    # Add language info to output if specified
+    if language:
+        serialized_content.append(f"Directory Structure ({language} files only):")
+    else:
+        serialized_content.append("Directory Structure:")
+
+    generate_ascii_structure(
+        repo_path, serialized_content=serialized_content, language=language
+    )
 
     # Skip file contents if structure_only is True
     if not structure_only:
         serialized_content.append("\nFiles Content:")
         for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if not should_skip(d, True)]
+            dirs[:] = [d for d in dirs if not should_skip(d, True, language)]
             for file in files:
-                if should_skip(file, False):
+                if should_skip(file, False, language):
                     continue
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, repo_path)
@@ -365,17 +262,51 @@ def serialize_repo(
                     serialized_content.append(f"[Error reading file: {str(e)}]")
 
     content_str = "\n".join(serialized_content)
+
+    # Add statistics - pass structure_only flag
+    total_lines, language_lines = count_lines(content_str, structure_only)
+
+    # Create statistics section
+    stats = [
+        "\n\nFile Statistics:",
+        f"Total lines in output: {total_lines}",
+    ]
+
+    # Only show language breakdown if not in structure-only mode
+    if not structure_only:
+        stats.append("Lines by language:")
+        # Add non-zero language counts
+        for lang, count in language_lines.items():
+            if count > 0:
+                stats.append(f"  {lang.capitalize()}: {count}")
+
+    # Add stats to content
+    content_str += "\n" + "\n".join(stats)
+
+    # Write to file
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(content_str)
+
+    # Print statistics to terminal
+    print("\nFile Statistics:")
+    print(f"Total lines in output: {total_lines}")
+    if not structure_only:
+        print("Lines by language:")
+        for lang, count in language_lines.items():
+            if count > 0:
+                print(f"  {lang.capitalize()}: {count}")
 
     if return_content:
         return content_str
 
 
-def serialize(repo_path, output_file, return_content=False, structure_only=False):
+def serialize(
+    repo_path, output_file, return_content=False, structure_only=False, language=None
+):
     return serialize_repo(
         repo_path,
         output_file,
         return_content=return_content,
         structure_only=structure_only,
+        language=language,
     )
