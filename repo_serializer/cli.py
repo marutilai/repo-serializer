@@ -5,7 +5,8 @@ from .serializer import serialize
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Serialize a repository into a single file"
+        description="""Serialize a repository into a structured text file, capturing directory structure, 
+        file names, and contents. Supports filtering by file type and various output formats."""
     )
     parser.add_argument("repo_path", help="Path to the repository to serialize")
     parser.add_argument(
@@ -29,12 +30,12 @@ def main():
     parser.add_argument(
         "--python",
         action="store_true",
-        help="Only include Python files (.py, .ipynb)",
+        help="Only include Python files (.py, .ipynb, .pyw, .pyx, .pxd, .pxi)",
     )
     parser.add_argument(
         "--javascript",
         action="store_true",
-        help="Only include JavaScript/TypeScript files (.js, .jsx, .ts, .tsx, etc.)",
+        help="Only include JavaScript/TypeScript files (.js, .jsx, .ts, .tsx, .vue, .svelte)",
     )
 
     args = parser.parse_args()
