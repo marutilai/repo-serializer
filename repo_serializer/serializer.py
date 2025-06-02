@@ -8,50 +8,48 @@ from .config import (
 )
 
 
-def should_skip(name, is_dir=False, language=None):
-    """Enhanced skip check with language filtering"""
+def should_skip(name, is_dir=False, language=None, skip_dirs=None):
+    """Enhanced skip check with language filtering and user-specified skip_dirs"""
     # First apply basic skip rules
     if name.startswith("."):
         return True
-    if is_dir and name in SKIP_DIRS:
-        return True
+    if is_dir:
+        skip_set = set(SKIP_DIRS)
+        if skip_dirs:
+            skip_set = skip_set.union(set(skip_dirs))
+        if name in skip_set:
+            return True
     if not is_dir:
         if name in SKIP_FILES:
             return True
-
         # If language filtering is enabled
         if language:
             patterns = LANGUAGE_PATTERNS.get(language, {})
             ext = os.path.splitext(name)[1].lower()
-
             # Skip if extension doesn't match language
             if ext not in patterns.get("extensions", set()):
                 return True
-
             # Skip if matches skip patterns
             if any(
                 pattern in name.lower()
                 for pattern in patterns.get("skip_patterns", set())
             ):
                 return True
-
             # File matches language requirements, don't skip
             return False
-
         # No language filtering, apply normal extension skip
         if os.path.splitext(name)[1] in SKIP_EXTENSIONS:
             return True
-
     return False
 
 
-def generate_ascii_structure(path, prefix="", serialized_content=None, language=None):
+def generate_ascii_structure(path, prefix="", serialized_content=None, language=None, skip_dirs=None):
     if serialized_content is None:
         serialized_content = []
     entries = sorted(
         e
         for e in os.listdir(path)
-        if not should_skip(e, os.path.isdir(os.path.join(path, e)), language)
+        if not should_skip(e, os.path.isdir(os.path.join(path, e)), language, skip_dirs)
     )
     for idx, entry in enumerate(entries):
         entry_path = os.path.join(path, entry)
@@ -60,7 +58,7 @@ def generate_ascii_structure(path, prefix="", serialized_content=None, language=
         if os.path.isdir(entry_path):
             extension = "    " if idx == len(entries) - 1 else "│   "
             generate_ascii_structure(
-                entry_path, prefix + extension, serialized_content, language
+                entry_path, prefix + extension, serialized_content, language, skip_dirs
             )
     return serialized_content
 
@@ -111,6 +109,7 @@ def serialize_repo(
     return_content=False,
     structure_only=False,
     language=None,
+    skip_dirs=None,
 ):
     serialized_content = []
 
@@ -121,16 +120,16 @@ def serialize_repo(
         serialized_content.append("Directory Structure:")
 
     generate_ascii_structure(
-        repo_path, serialized_content=serialized_content, language=language
+        repo_path, serialized_content=serialized_content, language=language, skip_dirs=skip_dirs
     )
 
     # Skip file contents if structure_only is True
     if not structure_only:
         serialized_content.append("\nFiles Content:")
         for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if not should_skip(d, True, language)]
+            dirs[:] = [d for d in dirs if not should_skip(d, True, language, skip_dirs)]
             for file in files:
-                if should_skip(file, False, language):
+                if should_skip(file, False, language, skip_dirs):
                     continue
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, repo_path)
@@ -301,7 +300,7 @@ def serialize_repo(
 
 
 def serialize(
-    repo_path, output_file, return_content=False, structure_only=False, language=None
+    repo_path, output_file, return_content=False, structure_only=False, language=None, skip_dirs=None
 ):
     return serialize_repo(
         repo_path,
@@ -309,4 +308,5 @@ def serialize(
         return_content=return_content,
         structure_only=structure_only,
         language=language,
+        skip_dirs=skip_dirs,
     )

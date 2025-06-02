@@ -37,6 +37,12 @@ def main():
         action="store_true",
         help="Only include JavaScript/TypeScript files (.js, .jsx, .ts, .tsx, .vue, .svelte)",
     )
+    parser.add_argument(
+        "--skip-dir",
+        action="append",
+        default=[],
+        help="Comma-separated list of directory names to skip (can be used multiple times)",
+    )
 
     args = parser.parse_args()
 
@@ -56,6 +62,11 @@ def main():
         print("Error: Cannot specify both --python and --javascript")
         return 1
 
+    # Flatten and split comma-separated skip-dir values
+    skip_dirs = []
+    for val in args.skip_dir:
+        skip_dirs.extend([d.strip() for d in val.split(",") if d.strip()])
+
     # Serialize the repository
     content = serialize(
         args.repo_path,
@@ -63,6 +74,7 @@ def main():
         return_content=True,
         structure_only=args.structure_only,
         language=language,
+        skip_dirs=skip_dirs,
     )
 
     print(f"Repository serialized to {args.output}")
