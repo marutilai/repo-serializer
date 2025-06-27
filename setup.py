@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="repo-serializer",
-    version="1.0.1",
+    version="1.1.2",
     author="Maruti Agarwal",
     author_email="marutiagarwal@gmail.com",
     description="A tool to serialize repository contents into a single file",

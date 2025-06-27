@@ -32,29 +32,24 @@ def should_skip(name, is_dir=False, language=None, full_path=None):
         if language:
             patterns = LANGUAGE_PATTERNS.get(language, {})
             ext = os.path.splitext(name)[1].lower()
-
             # Skip if extension doesn't match language
             if ext not in patterns.get("extensions", set()):
                 return True
-
             # Skip if matches skip patterns
             if any(
                 pattern in name.lower()
                 for pattern in patterns.get("skip_patterns", set())
             ):
                 return True
-
             # File matches language requirements, don't skip
             return False
-
         # No language filtering, apply normal extension skip
         if os.path.splitext(name)[1] in SKIP_EXTENSIONS:
             return True
-
     return False
 
 
-def generate_ascii_structure(path, prefix="", serialized_content=None, language=None):
+def generate_ascii_structure(path, prefix="", serialized_content=None, language=None, skip_dirs=None):
     if serialized_content is None:
         serialized_content = []
     entries = sorted(
@@ -74,7 +69,7 @@ def generate_ascii_structure(path, prefix="", serialized_content=None, language=
         if os.path.isdir(entry_path):
             extension = "    " if idx == len(entries) - 1 else "│   "
             generate_ascii_structure(
-                entry_path, prefix + extension, serialized_content, language
+                entry_path, prefix + extension, serialized_content, language, skip_dirs
             )
     return serialized_content
 
@@ -125,6 +120,7 @@ def serialize_repo(
     return_content=False,
     structure_only=False,
     language=None,
+    skip_dirs=None,
 ):
     serialized_content = []
 
@@ -135,7 +131,7 @@ def serialize_repo(
         serialized_content.append("Directory Structure:")
 
     generate_ascii_structure(
-        repo_path, serialized_content=serialized_content, language=language
+        repo_path, serialized_content=serialized_content, language=language, skip_dirs=skip_dirs
     )
 
     # Skip file contents if structure_only is True
@@ -319,7 +315,7 @@ def serialize_repo(
 
 
 def serialize(
-    repo_path, output_file, return_content=False, structure_only=False, language=None
+    repo_path, output_file, return_content=False, structure_only=False, language=None, skip_dirs=None
 ):
     return serialize_repo(
         repo_path,
@@ -327,4 +323,5 @@ def serialize(
         return_content=return_content,
         structure_only=structure_only,
         language=language,
+        skip_dirs=skip_dirs,
     )

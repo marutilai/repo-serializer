@@ -26,6 +26,10 @@ repo-serializer /path/to/repository -c
 # Use structure-only mode to output only the directory structure and filenames
 repo-serializer /path/to/repository -s
 
+# Skip specific directories (can be used multiple times or as a comma-separated list)
+repo-serializer /path/to/repository --skip-dir build,dist
+repo-serializer /path/to/repository --skip-dir build --skip-dir dist
+
 # Only include Python files (.py, .ipynb)
 repo-serializer /path/to/repository --python
 
@@ -41,8 +45,8 @@ repo-serializer /path/to/repository --python -s -c  # Python files, structure on
 ```python
 from repo_serializer import serialize
 
-# Serialize a repository
-serialize("/path/to/repository", "output.txt")
+# Serialize a repository, skipping specific directories
+serialize("/path/to/repository", "output.txt", skip_dirs=["build", "dist"])
 ```
 
 ## Features
