@@ -118,4 +118,7 @@ coverage.xml
 # Test outputs and generated files
 test_outputs/
 *.txt
-!README.txt  # Don't ignore README.txt if it exists 
+!README.txt  # Don't ignore README.txt if it exists
+
+# Claude configuration
+CLAUDE.md 

@@ -30,5 +30,9 @@ setup(
     },
     install_requires=[
         "pyperclip",  # For clipboard functionality
+        "pyyaml>=6.0",  # For YAML file parsing and prompt extraction
     ],
+    extras_require={
+        "dev": ["pytest>=7.0"],  # Development dependencies
+    },
 )

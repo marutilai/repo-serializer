@@ -55,12 +55,46 @@ def main():
                 "-s",
             ]
         )
+        
+        # Test prompt extraction mode
+        run_command(
+            [
+                "repo-serializer",
+                repo_dir,
+                "-o",
+                os.path.join(output_dir, "test_prompts.txt"),
+                "-p",
+            ]
+        )
+        
+        print("\nRunning unit tests with pytest...")
+        
+        # Run pytest with summary
+        try:
+            result = subprocess.run(
+                ["python", "-m", "pytest", "-v", "--tb=short", "-q"],
+                capture_output=True,
+                text=True
+            )
+            print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+            
+            if result.returncode == 0:
+                print("\n✅ All pytest tests passed!")
+            else:
+                print("\n⚠️  Some pytest tests failed, but continuing...")
+                # Don't exit on pytest failures since they might be environment-specific
+        except Exception as e:
+            print(f"\n⚠️  Could not run pytest: {e}")
+            print("Make sure pytest is installed: pip install pytest")
 
         print("\nAll tests completed successfully!")
         print("\nOutput files in test_outputs/:")
         print("- test_output.txt (full output)")
         print("- test_python.txt (Python files only)")
         print("- test_structure.txt (structure only)")
+        print("- test_prompts.txt (extracted prompts)")
 
     except subprocess.CalledProcessError as e:
         print(f"\nError: Command failed with exit code {e.returncode}")

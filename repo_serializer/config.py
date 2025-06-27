@@ -148,14 +148,14 @@ SKIP_DIRS = {
     "out",
     "cache",
     "temp",
-    # Test directories
-    "tests",
-    "test",
-    "__tests__",
-    "spec",
-    "__mocks__",
-    "fixtures",
-    "e2e",
+    # Test directories - commented out to allow test directory inclusion
+    # "tests",
+    # "test", 
+    # "__tests__",
+    # "spec",
+    # "__mocks__",
+    # "fixtures",
+    # "e2e",
     # Documentation directories
     "docs",
     "doc",
@@ -178,8 +178,6 @@ SKIP_DIRS = {
     ".classpath",
     ".factorypath",
     # Misc
-    "examples",
-    "sample",
     "demo",
     "assets",
     "images",
@@ -190,7 +188,7 @@ SKIP_DIRS = {
 LANGUAGE_PATTERNS = {
     "python": {
         "extensions": {".py", ".ipynb", ".pyw", ".pyx", ".pxd", ".pxi"},
-        "skip_patterns": {"test_", "_test", "conftest.py"},
+        "skip_patterns": {},  # Removed test file filtering to allow test files
     },
     "javascript": {
         "extensions": {".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte"},
@@ -203,3 +201,131 @@ LANGUAGE_PATTERNS = {
         },
     },
 }
+
+# Prompt-related patterns for extraction
+PROMPT_FILE_PATTERNS = {
+    # Standalone prompt files
+    "standalone": {
+        ".prompt.txt",
+        ".prompt.md",
+        ".prompt.yaml",
+        ".prompt.yml",
+        ".prompt.json",
+        ".prompts.yaml",
+        ".prompts.yml",
+        ".prompts.json",
+    },
+    # Common prompt directories
+    "directories": {
+        "prompts",
+        "prompt",
+        "ai_prompts",
+        "llm_prompts",
+        "templates/prompts",
+        "docs/prompts",
+    },
+}
+
+# LLM API patterns for inline prompt detection
+LLM_API_PATTERNS = {
+    "python": [
+        # OpenAI patterns
+        r"openai\.ChatCompletion\.create",
+        r"openai\.Completion\.create",
+        r"chat\.completions\.create",
+        r"client\.chat\.completions\.create",
+        # Anthropic patterns
+        r"anthropic\.messages\.create",
+        r"claude\.messages\.create",
+        r"client\.messages\.create",
+        # LangChain patterns
+        r"PromptTemplate",
+        r"ChatPromptTemplate",
+        r"SystemMessagePromptTemplate",
+        r"HumanMessagePromptTemplate",
+        # General patterns
+        r"prompt\s*=\s*[\"\']{1,3}",
+        r"system_prompt\s*=\s*[\"\']{1,3}",
+        r"user_prompt\s*=\s*[\"\']{1,3}",
+        r"instructions\s*=\s*[\"\']{1,3}",
+    ],
+    "javascript": [
+        # OpenAI patterns
+        r"openai\.chat\.completions\.create",
+        r"openai\.completions\.create",
+        # Anthropic patterns
+        r"anthropic\.messages\.create",
+        r"claude\.messages\.create",
+        # General patterns
+        r"prompt\s*=\s*[`\"\']{1,3}",
+        r"systemPrompt\s*=\s*[`\"\']{1,3}",
+        r"userPrompt\s*=\s*[`\"\']{1,3}",
+        r"instructions\s*=\s*[`\"\']{1,3}",
+    ],
+}
+
+# Keywords that indicate a string might be a prompt
+PROMPT_KEYWORDS = [
+    "you are",
+    "you're a",
+    "act as",
+    "behave as",
+    "your task is",
+    "your role is",
+    "instructions:",
+    "system:",
+    "user:",
+    "assistant:",
+    "human:",
+    "ai:",
+    "context:",
+    "objective:",
+    "guidelines:",
+    "constraints:",
+    "examples:",
+    "format:",
+    "output format:",
+    "respond with",
+    "generate",
+    "create",
+    "analyze",
+    "summarize",
+    "extract",
+    "follow these",
+    "step-by-step",
+    "think step by step",
+]
+
+# YAML/JSON keys that typically contain prompts
+PROMPT_CONFIG_KEYS = [
+    "prompt",
+    "prompts",
+    "system",
+    "system_prompt",
+    "systemPrompt",
+    "user",
+    "user_prompt",
+    "userPrompt",
+    "assistant",
+    "assistant_prompt",
+    "assistantPrompt",
+    "human",
+    "human_prompt",
+    "humanPrompt",
+    "instruction",
+    "instructions",
+    "message",
+    "messages",
+    "template",
+    "templates",
+    "context",
+    "prefix",
+    "suffix",
+    "description",
+    "task",
+    "role",
+    "guidelines",
+    "rules",
+    "constraints",
+    "examples",
+]

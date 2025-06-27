@@ -7,6 +7,9 @@ A Python utility for serializing local Git repositories into a structured text f
 ```bash
 # Install from PyPI
 pip install repo-serializer
+
+# For development
+pip install "repo-serializer[dev]"
 ```
 
 ## Usage
@@ -38,6 +41,10 @@ repo-serializer /path/to/repository --javascript
 
 # Combine with other options
 repo-serializer /path/to/repository --python -s -c  # Python files, structure only, copy to clipboard
+
+# Extract AI/LLM prompts from the repository
+repo-serializer /path/to/repository -p
+repo-serializer /path/to/repository --prompt -o prompts.txt
 ```
 
 ### Python API
@@ -61,12 +68,75 @@ serialize("/path/to/repository", "output.txt", skip_dirs=["build", "dist"])
   - Handles non-UTF-8 and binary files gracefully
 - **Extensive Filtering**: Skips common configuration files, build artifacts, test directories, and more.
 - **Clipboard Integration**: Option to copy output directly to clipboard.
+- **Prompt Extraction**: Extract AI/LLM prompts from various sources:
+  - Inline strings in Python/JavaScript code near LLM API calls (OpenAI, Anthropic, etc.)
+  - Standalone prompt files (`.prompt.txt`, `.prompt.md`, etc.)
+  - YAML/JSON configuration files with prompt definitions
+  - Jupyter notebooks containing prompts
+  - Markdown files in prompt-related directories
 
 ## Example
 
 ```bash
 # Create a serialized snapshot of your project
 repo-serializer /Users/example_user/projects/my_repo -o repo_snapshot.txt
+```
+
+## Prompt Extraction
+
+The prompt extraction feature (`-p` or `--prompt`) helps you analyze and audit AI/LLM prompts used throughout your codebase. This is particularly useful for:
+
+- Reviewing prompt consistency and quality
+- Refactoring duplicate prompts
+- Creating prompt libraries
+- Documenting AI behavior
+- Security auditing of prompts
+
+### What Gets Extracted
+
+1. **Inline Prompts in Code**
+   - Strings near OpenAI, Anthropic, and other LLM API calls
+   - Multi-line strings assigned to prompt-related variables
+   - Template literals in JavaScript/TypeScript
+
+2. **Standalone Prompt Files**
+   - Files with extensions like `.prompt.txt`, `.prompt.md`
+   - Files in `prompts/` or similar directories
+   - YAML/JSON files with prompt configurations
+
+3. **Configuration Files**
+   - YAML/JSON files with keys like `prompt`, `system_prompt`, `instructions`
+   - Nested prompt definitions in configuration objects
+
+### Example Output
+
+```
+Found 5 prompts in the repository:
+================================================================================
+
+File: src/ai_agent.py
+--------------------------------------------------------------------------------
+
+Line 15 (inline_string) - Near LLM API call:
+```
+You are an expert Python developer. Your task is to help users write clean,
+efficient, and well-documented Python code. Follow these guidelines:
+
+1. Always use proper error handling
+2. Write comprehensive docstrings
+3. Follow PEP 8 style guidelines
+```
+
+File: config/prompts.yaml
+--------------------------------------------------------------------------------
+
+Line 3 (config_file) - Key: system:
+```
+You are a code reviewer. Analyze the provided code for:
+- Security vulnerabilities
+- Performance issues
+- Code quality and maintainability
+```
 ```
 
 ## Contributing
