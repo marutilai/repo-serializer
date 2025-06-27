@@ -8,20 +8,26 @@ from .config import (
 )
 
 
-def should_skip(name, is_dir=False, language=None, skip_dirs=None):
-    """Enhanced skip check with language filtering and user-specified skip_dirs"""
+def should_skip(name, is_dir=False, language=None, full_path=None):
+    """Enhanced skip check with language filtering"""
     # First apply basic skip rules
     if name.startswith("."):
         return True
     if is_dir:
-        skip_set = set(SKIP_DIRS)
-        if skip_dirs:
-            skip_set = skip_set.union(set(skip_dirs))
-        if name in skip_set:
-            return True
-    if not is_dir:
-        if name in SKIP_FILES:
-            return True
+        for pattern in SKIP_DIRS:
+            if "/" in pattern and full_path:
+                if full_path.replace(os.sep, "/").endswith(pattern):
+                    return True
+            elif name == pattern:
+                return True
+    else:
+        for pattern in SKIP_FILES:
+            if "/" in pattern and full_path:
+                if full_path.replace(os.sep, "/").endswith(pattern):
+                    return True
+            elif name == pattern:
+                return True
+
         # If language filtering is enabled
         if language:
             patterns = LANGUAGE_PATTERNS.get(language, {})
@@ -49,7 +55,12 @@ def generate_ascii_structure(path, prefix="", serialized_content=None, language=
     entries = sorted(
         e
         for e in os.listdir(path)
-        if not should_skip(e, os.path.isdir(os.path.join(path, e)), language, skip_dirs)
+        if not should_skip(
+            e,
+            os.path.isdir(os.path.join(path, e)),
+            language,
+            os.path.join(path, e),
+        )
     )
     for idx, entry in enumerate(entries):
         entry_path = os.path.join(path, entry)
@@ -127,9 +138,13 @@ def serialize_repo(
     if not structure_only:
         serialized_content.append("\nFiles Content:")
         for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if not should_skip(d, True, language, skip_dirs)]
+            dirs[:] = [
+                d
+                for d in dirs
+                if not should_skip(d, True, language, os.path.join(root, d))
+            ]
             for file in files:
-                if should_skip(file, False, language, skip_dirs):
+                if should_skip(file, False, language, os.path.join(root, file)):
                     continue
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, repo_path)
