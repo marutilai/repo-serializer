@@ -163,20 +163,50 @@ class PromptExtractor:
                 content = f.read()
                 lines = content.split('\n')
                 
-            # First, check for LLM API calls
+            # Track already found prompts to avoid duplicates
+            found_prompts = set()
+            
+            # First, check for LLM API calls and extract nearby prompts
+            api_call_lines = set()
             for i, line in enumerate(lines):
                 for pattern in LLM_API_PATTERNS['python']:
                     if re.search(pattern, line):
-                        # Found an API call, look for strings nearby
-                        self._extract_nearby_strings(lines, i, rel_path, 'python')
+                        api_call_lines.add(i)
+                        
+            # Extract prompts near API calls
+            for line_idx in api_call_lines:
+                self._extract_nearby_strings(lines, line_idx, rel_path, 'python', found_prompts)
                         
             # Also look for standalone strings that look like prompts
             try:
                 tree = ast.parse(content)
+                
+                # First, collect all docstring positions to exclude them
+                docstring_positions = set()
+                for node in ast.walk(tree):
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
+                        # Get the first statement in the body
+                        if (node.body and 
+                            isinstance(node.body[0], ast.Expr) and 
+                            isinstance(node.body[0].value, ast.Constant) and
+                            isinstance(node.body[0].value.value, str)):
+                            docstring_positions.add(node.body[0].value.lineno)
+                
+                # Now extract prompts, excluding docstrings
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                        line_num = node.lineno if hasattr(node, 'lineno') else 1
+                        
+                        # Skip if it's a docstring
+                        if line_num in docstring_positions:
+                            continue
+                            
+                        # Skip if already found near API call
+                        content_hash = hash(node.value.strip())
+                        if content_hash in found_prompts:
+                            continue
+                            
                         if self._is_likely_prompt(node.value):
-                            line_num = node.lineno if hasattr(node, 'lineno') else 1
                             self.prompts.append({
                                 'file': rel_path,
                                 'line': line_num,
@@ -184,9 +214,10 @@ class PromptExtractor:
                                 'content': node.value.strip(),
                                 'context': 'String constant'
                             })
+                            found_prompts.add(content_hash)
             except Exception:
                 # If AST parsing fails, fall back to regex
-                self._extract_with_regex(content, rel_path, 'python')
+                self._extract_with_regex(content, rel_path, 'python', found_prompts)
                 
         except Exception:
             pass
@@ -198,14 +229,22 @@ class PromptExtractor:
                 content = f.read()
                 lines = content.split('\n')
                 
+            # Track already found prompts to avoid duplicates
+            found_prompts = set()
+            
             # Check for LLM API calls
+            api_call_lines = set()
             for i, line in enumerate(lines):
                 for pattern in LLM_API_PATTERNS['javascript']:
                     if re.search(pattern, line):
-                        self._extract_nearby_strings(lines, i, rel_path, 'javascript')
+                        api_call_lines.add(i)
+                        
+            # Extract prompts near API calls
+            for line_idx in api_call_lines:
+                self._extract_nearby_strings(lines, line_idx, rel_path, 'javascript', found_prompts)
                         
             # Extract string literals and template literals that look like prompts
-            self._extract_with_regex(content, rel_path, 'javascript')
+            self._extract_with_regex(content, rel_path, 'javascript', found_prompts)
                 
         except Exception:
             pass
@@ -216,38 +255,53 @@ class PromptExtractor:
             with open(file_path, 'r', encoding='utf-8') as f:
                 notebook = json.load(f)
                 
+            found_prompts = set()
+            
             for i, cell in enumerate(notebook.get('cells', [])):
                 if cell.get('cell_type') == 'code':
                     source = ''.join(cell.get('source', []))
                     # Treat as Python code
                     lines = source.split('\n')
+                    
+                    # Check for API calls
+                    api_call_lines = set()
                     for j, line in enumerate(lines):
                         for pattern in LLM_API_PATTERNS['python']:
                             if re.search(pattern, line):
-                                self._extract_nearby_strings(
-                                    lines, j, rel_path, 'python', 
-                                    line_offset=f"Cell {i+1}, "
-                                )
+                                api_call_lines.add(j)
+                    
+                    # Extract prompts near API calls
+                    for line_idx in api_call_lines:
+                        self._extract_nearby_strings(
+                            lines, line_idx, rel_path, 'python', found_prompts,
+                            line_offset=f"Cell {i+1}, "
+                        )
                                 
-                    # Also check for standalone prompts
-                    if self._is_likely_prompt(source):
-                        self.prompts.append({
-                            'file': rel_path,
-                            'line': f"Cell {i+1}",
-                            'type': 'notebook_cell',
-                            'content': source.strip(),
-                            'context': 'Code cell'
-                        })
+                    # Also check for standalone prompts in the cell
+                    if self._is_likely_prompt(source) and len(source.strip()) > 100:
+                        content_hash = hash(source.strip())
+                        if content_hash not in found_prompts:
+                            self.prompts.append({
+                                'file': rel_path,
+                                'line': f"Cell {i+1}",
+                                'type': 'notebook_cell',
+                                'content': source.strip(),
+                                'context': 'Code cell with prompt'
+                            })
+                            found_prompts.add(content_hash)
                         
         except Exception:
             pass
     
     def _extract_nearby_strings(self, lines: List[str], line_idx: int, 
-                               file_path: str, language: str, line_offset: str = ""):
+                               file_path: str, language: str, found_prompts: set = None, line_offset: str = ""):
         """Extract string literals near an LLM API call."""
-        # Look within 20 lines before and after
-        start = max(0, line_idx - 20)
-        end = min(len(lines), line_idx + 20)
+        if found_prompts is None:
+            found_prompts = set()
+            
+        # Look within 10 lines before and after (reduced from 20)
+        start = max(0, line_idx - 10)
+        end = min(len(lines), line_idx + 10)
         
         # Join lines for multi-line string detection
         context_lines = lines[start:end]
@@ -255,87 +309,126 @@ class PromptExtractor:
         
         # Extract strings based on language
         if language == 'python':
-            # Triple quotes
-            for match in re.finditer(r'"""(.*?)"""', context_text, re.DOTALL):
-                content = match.group(1).strip()
-                if len(content) > 30:
-                    line_num = start + context_text[:match.start()].count('\n') + 1
-                    self.prompts.append({
-                        'file': file_path,
-                        'line': f"{line_offset}{line_num}",
-                        'type': 'api_call_string',
-                        'content': content,
-                        'context': 'Near LLM API call'
-                    })
-                    
-            # Single quotes versions
-            for match in re.finditer(r"'''(.*?)'''", context_text, re.DOTALL):
-                content = match.group(1).strip()
-                if len(content) > 30:
-                    line_num = start + context_text[:match.start()].count('\n') + 1
-                    self.prompts.append({
-                        'file': file_path,
-                        'line': f"{line_offset}{line_num}",
-                        'type': 'api_call_string',
-                        'content': content,
-                        'context': 'Near LLM API call'
-                    })
-                    
-        elif language == 'javascript':
-            # Template literals
-            for match in re.finditer(r'`([^`]+)`', context_text, re.DOTALL):
-                content = match.group(1).strip()
+            # Look for actual prompt assignments or parameters
+            # Check for prompt variable assignments
+            prompt_patterns = [
+                r'(?:system_)?prompt\s*=\s*["\'](.+?)["\']',
+                r'(?:user_)?prompt\s*=\s*["\'](.+?)["\']',
+                r'messages\s*=\s*\[.*?"content":\s*["\'](.+?)["\']',
+                r'"content":\s*"""(.*?)"""',
+                r'"content":\s*["\'](.+?)["\']',
+            ]
+            
+            for pattern in prompt_patterns:
+                for match in re.finditer(pattern, context_text, re.DOTALL):
+                    content = match.group(1).strip()
+                    if len(content) > 30 and self._is_likely_prompt(content):
+                        content_hash = hash(content)
+                        if content_hash not in found_prompts:
+                            line_num = start + context_text[:match.start()].count('\n') + 1
+                            self.prompts.append({
+                                'file': file_path,
+                                'line': f"{line_offset}{line_num}",
+                                'type': 'api_call_prompt',
+                                'content': content,
+                                'context': 'LLM API parameter'
+                            })
+                            found_prompts.add(content_hash)
+            
+            # Also check for triple-quoted strings that are assigned to prompt variables
+            for match in re.finditer(r'(\w*prompt\w*)\s*=\s*"""(.*?)"""', context_text, re.DOTALL | re.IGNORECASE):
+                var_name = match.group(1)
+                content = match.group(2).strip()
                 if len(content) > 30 and self._is_likely_prompt(content):
-                    line_num = start + context_text[:match.start()].count('\n') + 1
-                    self.prompts.append({
-                        'file': file_path,
-                        'line': f"{line_offset}{line_num}",
-                        'type': 'api_call_string',
-                        'content': content,
-                        'context': 'Near LLM API call'
-                    })
-    
-    def _extract_with_regex(self, content: str, file_path: str, language: str):
-        """Extract prompts using regex patterns."""
-        if language == 'python':
-            # Triple quoted strings
-            for match in re.finditer(r'"""(.*?)"""', content, re.DOTALL):
-                text = match.group(1).strip()
-                if self._is_likely_prompt(text):
-                    line_num = content[:match.start()].count('\n') + 1
-                    self.prompts.append({
-                        'file': file_path,
-                        'line': line_num,
-                        'type': 'inline_string',
-                        'content': text,
-                        'context': 'Triple-quoted string'
-                    })
-                    
-            for match in re.finditer(r"'''(.*?)'''", content, re.DOTALL):
-                text = match.group(1).strip()
-                if self._is_likely_prompt(text):
-                    line_num = content[:match.start()].count('\n') + 1
-                    self.prompts.append({
-                        'file': file_path,
-                        'line': line_num,
-                        'type': 'inline_string',
-                        'content': text,
-                        'context': 'Triple-quoted string'
-                    })
+                    content_hash = hash(content)
+                    if content_hash not in found_prompts:
+                        line_num = start + context_text[:match.start()].count('\n') + 1
+                        self.prompts.append({
+                            'file': file_path,
+                            'line': f"{line_offset}{line_num}",
+                            'type': 'prompt_variable',
+                            'content': content,
+                            'context': f'Variable: {var_name}'
+                        })
+                        found_prompts.add(content_hash)
                     
         elif language == 'javascript':
-            # Template literals that span multiple lines
-            for match in re.finditer(r'`([^`]+)`', content, re.DOTALL):
-                text = match.group(1).strip()
-                if self._is_likely_prompt(text) and '\n' in text:
+            # Template literals used as prompts
+            prompt_patterns = [
+                r'(?:system)?[Pp]rompt\s*[:=]\s*`([^`]+)`',
+                r'content\s*:\s*`([^`]+)`',
+                r'messages\s*:\s*\[.*?content\s*:\s*["\'](.+?)["\']',
+            ]
+            
+            for pattern in prompt_patterns:
+                for match in re.finditer(pattern, context_text, re.DOTALL):
+                    content = match.group(1).strip()
+                    if len(content) > 30 and self._is_likely_prompt(content):
+                        content_hash = hash(content)
+                        if content_hash not in found_prompts:
+                            line_num = start + context_text[:match.start()].count('\n') + 1
+                            self.prompts.append({
+                                'file': file_path,
+                                'line': f"{line_offset}{line_num}",
+                                'type': 'api_call_prompt',
+                                'content': content,
+                                'context': 'LLM API parameter'
+                            })
+                            found_prompts.add(content_hash)
+    
+    def _extract_with_regex(self, content: str, file_path: str, language: str, found_prompts: set = None):
+        """Extract prompts using regex patterns."""
+        if found_prompts is None:
+            found_prompts = set()
+            
+        if language == 'python':
+            # Look for prompt-like variable assignments with triple quotes
+            for match in re.finditer(r'(\w*(?:prompt|instruction|system|user|message)\w*)\s*=\s*"""(.*?)"""', content, re.DOTALL | re.IGNORECASE):
+                var_name = match.group(1)
+                text = match.group(2).strip()
+                content_hash = hash(text)
+                if self._is_likely_prompt(text) and content_hash not in found_prompts:
                     line_num = content[:match.start()].count('\n') + 1
                     self.prompts.append({
                         'file': file_path,
                         'line': line_num,
-                        'type': 'inline_string',
+                        'type': 'prompt_variable',
                         'content': text,
-                        'context': 'Template literal'
+                        'context': f'Variable: {var_name}'
                     })
+                    found_prompts.add(content_hash)
+                    
+            # Look for dictionaries with prompt-like keys
+            for match in re.finditer(r'["\'](?:prompt|system_prompt|user_prompt|instruction)["\']:\s*["\'](.+?)["\']', content, re.DOTALL | re.IGNORECASE):
+                text = match.group(1).strip()
+                content_hash = hash(text)
+                if self._is_likely_prompt(text) and content_hash not in found_prompts:
+                    line_num = content[:match.start()].count('\n') + 1
+                    self.prompts.append({
+                        'file': file_path,
+                        'line': line_num,
+                        'type': 'prompt_dict',
+                        'content': text,
+                        'context': 'Dictionary value'
+                    })
+                    found_prompts.add(content_hash)
+                    
+        elif language == 'javascript':
+            # Template literals that span multiple lines and look like prompts
+            for match in re.finditer(r'(?:const|let|var)\s+(\w*(?:prompt|instruction|system|message)\w*)\s*=\s*`([^`]+)`', content, re.DOTALL | re.IGNORECASE):
+                var_name = match.group(1)
+                text = match.group(2).strip()
+                content_hash = hash(text)
+                if self._is_likely_prompt(text) and '\n' in text and content_hash not in found_prompts:
+                    line_num = content[:match.start()].count('\n') + 1
+                    self.prompts.append({
+                        'file': file_path,
+                        'line': line_num,
+                        'type': 'prompt_variable',
+                        'content': text,
+                        'context': f'Variable: {var_name}'
+                    })
+                    found_prompts.add(content_hash)
     
     def _is_likely_prompt(self, text: str) -> bool:
         """Determine if a string is likely to be a prompt."""
@@ -344,24 +437,69 @@ class PromptExtractor:
             
         text_lower = text.lower()
         
+        # Exclude common non-prompt patterns
+        exclude_patterns = [
+            # Documentation patterns
+            'args:', 'arguments:', 'parameters:', 'params:',
+            'returns:', 'return:', 'yields:', 'yield:',
+            'raises:', 'raise:', 'throws:', 'examples:',
+            'deprecated:', 'see also:', 'references:',
+            ':param', ':type', ':return', ':rtype', ':raises',
+            'attributes:', 'methods:', 'properties:',
+            # Test/logging messages
+            'error:', 'warning:', 'info:', 'debug:',
+            'failed to', 'could not', 'unable to',
+            'successfully', 'completed', 'finished',
+            # Status messages
+            'note: only', 'note that', 'please note',
+            'found', 'extracted', 'processed',
+            'skipping', 'included', 'excluded',
+            # Generic descriptions
+            'this is a', 'this is the', 'this file',
+            'this function', 'this method', 'this class',
+        ]
+        
+        # Check if it contains exclude patterns
+        if any(pattern in text_lower for pattern in exclude_patterns):
+            # But still allow if it has very strong prompt indicators
+            strong_prompt_count = sum(1 for keyword in ['you are', 'you must', 'your task is', 'your role is', 'act as', 'behave as'] if keyword in text_lower)
+            if strong_prompt_count < 2:
+                return False
+        
+        # Exclude if it's a simple status/log message
+        if len(text.split()) < 15 and not any(keyword in text_lower for keyword in ['you are', 'your task', 'your role', 'act as']):
+            return False
+        
         # Check for prompt keywords
         keyword_count = sum(1 for keyword in PROMPT_KEYWORDS if keyword in text_lower)
         if keyword_count >= 2:
             return True
             
         # Check for instruction-like patterns
-        if any(pattern in text_lower for pattern in [
-            'please', 'ensure', 'make sure', 'be sure to', 'remember to',
+        instruction_patterns = [
+            'you are', 'you must', 'you should', 'you will', 'you can',
+            'please ensure', 'make sure', 'be sure to', 'remember to',
             'do not', "don't", 'avoid', 'never', 'always',
-            'step 1', 'step 2', 'first,', 'second,', 'finally,',
-            'input:', 'output:', 'example:', 'note:',
-        ]):
+            'your task', 'your role', 'your goal', 'your objective',
+            'generate', 'create', 'write', 'provide', 'analyze',
+            'follow these', 'follow the', 'use the following',
+            'respond with', 'respond by', 'reply with',
+            'act as', 'behave as', 'function as',
+            'when asked', 'if asked', 'when prompted',
+        ]
+        
+        pattern_count = sum(1 for pattern in instruction_patterns if pattern in text_lower)
+        if pattern_count >= 2:
             return True
             
-        # Check structure - multiple sentences or bullet points
-        if text.count('.') > 3 or text.count('\n') > 2 or text.count('-') > 2:
-            if any(keyword in text_lower for keyword in PROMPT_KEYWORDS[:10]):
-                return True
+        # For multi-line text, check if it has prompt-like structure
+        if '\n' in text:
+            lines = text.strip().split('\n')
+            # Check for instruction lists
+            if len(lines) >= 3:
+                bullet_lines = sum(1 for line in lines if line.strip().startswith(('-', '*', '•', '1.', '2.', '3.')))
+                if bullet_lines >= 2 and any(keyword in text_lower for keyword in PROMPT_KEYWORDS[:10]):
+                    return True
                 
         return False
 
